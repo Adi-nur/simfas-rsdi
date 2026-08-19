@@ -1,4 +1,4 @@
-# MedInventory Pro
+# SIMFAS RS Umum Darul Istiqomah
 
 **Hospital Inventory Management System**
 
