@@ -1,41 +1,40 @@
 # SIMFAS RS Umum Darul Istiqomah
 
-**Hospital Inventory Management System**
+**Sistem Manajemen Inventaris Rumah Sakit**
 
-MedInventory Pro is a professional, modern, and comprehensive inventory management system designed for hospital operations. It streamlines the tracking of medical supplies, pharmaceuticals, and general hospital assets.
+MedInventory Pro adalah sistem manajemen inventaris yang profesional, modern, dan komprehensif yang dirancang untuk operasional rumah sakit. Sistem ini menyederhanakan pelacakan persediaan medis, obat-obatan, dan aset umum rumah sakit.
 
-## Core Features
+## Fitur Utama
 
-*   **Dashboard**: Real-time statistics for total items, low stock, expired goods, and recent activities.
-*   **Master Data Management**: Centralized database for items (medicine, medical equipment, PPE, etc.), suppliers, and storage locations.
-*   **Stock Management**:
-    *   Incoming goods (from suppliers or other units).
-    *   Outgoing goods (usage in units like ER, ICU, etc.).
-    *   Internal mutations (moving items between warehouses).
-    *   Stock Opname (physical inventory count).
-*   **Procurement & Requests**: Workflow for unit-based supply requests and procurement processes.
-*   **Alerts & Notifications**: Automatic warnings for low stock levels and approaching expiration dates.
+*   **Dasbor**: Statistik waktu nyata untuk total item, stok rendah, barang kadaluarsa, dan aktivitas terkini.
+*   **Manajemen Data Induk**: Basis data terpusat untuk barang (obat-obatan, peralatan medis, APD, dll.), pemasok, dan lokasi penyimpanan.
+*   **Manajemen Stok**:
+    *   Barang masuk (dari pemasok atau unit lain).
+    *   Barang keluar (penggunaan di unit-unit seperti UGD, ICU, dll.).
+    *   Mutasi internal (memindahkan barang antar gudang).
+    *   Stock Opname (penghitungan inventaris fisik).
+*   **Pengadaan & Permintaan**: Alur kerja untuk permintaan pasokan berbasis unit dan proses pengadaan.
+*   **Peringatan & Pemberitahuan**: Peringatan otomatis untuk tingkat stok rendah dan tanggal kedaluwarsa yang mendekat.
 
-## Technology Stack
+## Tumpukan Teknologi
 
 *   **Frontend**: Flutter (Mobile & Tablet)
-*   **UI Framework**: Material 3
-*   **State Management**: (Planned: Provider or Bloc)
-*   **Backend Interface**: (Planned: Laravel REST API)
+*   **Kerangka Kerja UI**: Material 3
+*   **Manajemen Negara**: (Terencana: Penyedia atau Blok)
+*   **Antarmuka Backend**: (Rencana: Laravel REST API)
 
-## Getting Started
+## Memulai
+1.  Kloning repositori tersebut.
+2.  Jalankan perintah `flutter pub get` untuk menginstal dependensi.
+3.  Jalankan aplikasi menggunakan `flutter run`.
 
-1.  Clone the repository.
-2.  Run `flutter pub get` to install dependencies.
-3.  Run the app using `flutter run`.
+## Status Proyek Saat Ini
 
-## Current Project Status
-
-- [x] Initial Dashboard UI
-- [x] Master Data Navigation
-- [x] Inventory Item List View
-- [x] Add New Item Form
-- [x] Stock Management Navigation
-- [ ] Backend API Integration
-- [ ] Barcode/QR Code Scanner
-- [ ] Reports and Analytics
+- [x] Antarmuka Pengguna Dasbor Awal
+- [x] Navigasi Data Utama
+- [x] Tampilan Daftar Item Inventaris
+- [x] Formulir Tambah Item Baru
+- [x] Navigasi Manajemen Stok
+- [ ] Integrasi API Backend
+- [ ] Pemindai Kode Batang/Kode QR
+- [ ] Laporan dan Analisis
