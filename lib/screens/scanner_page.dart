@@ -170,7 +170,7 @@ class QrScannerOverlayShape extends ShapeBorder {
   final double borderWidth;
   final double cutOutSide;
 
-  QrScannerOverlayShape({
+  const QrScannerOverlayShape({
     this.borderColor = Colors.white,
     this.borderRadius = 0,
     this.borderLength = 40,

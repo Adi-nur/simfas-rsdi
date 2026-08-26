@@ -6,7 +6,6 @@ import 'screens/master_data_page.dart';
 import 'screens/stock_management_page.dart';
 import 'screens/login_page.dart';
 import 'screens/transaction_history_page.dart';
-import 'models/user_role.dart';
 import 'services/auth_service.dart';
 
 Future<void> main() async {

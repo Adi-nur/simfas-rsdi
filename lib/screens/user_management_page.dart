@@ -866,6 +866,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
                               await _fetchUsers();
 
+                              if (!mounted) return;
                               _showSnackBar(
                                 'User berhasil didaftarkan.',
                               );

@@ -28,6 +28,7 @@ class _ApprovalListPageState extends State<ApprovalListPage> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -38,11 +39,13 @@ class _ApprovalListPageState extends State<ApprovalListPage> {
   Future<void> _handleApprove(int id) async {
     try {
       await _repo.approveRequest(id);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Permintaan disetujui'), backgroundColor: Colors.green),
       );
       _fetchRequests();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menyetujui: $e'), backgroundColor: Colors.red),
       );

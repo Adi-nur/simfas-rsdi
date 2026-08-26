@@ -75,7 +75,7 @@ class _AddItemPageState extends State<AddItemPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField<ItemCategory>(
-                      value: _selectedCategory,
+                      initialValue: _selectedCategory,
                       decoration: const InputDecoration(
                         labelText: 'Kategori',
                         border: OutlineInputBorder(),
@@ -100,7 +100,7 @@ class _AddItemPageState extends State<AddItemPage> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _selectedUnit,
+                      initialValue: _selectedUnit,
                       decoration: const InputDecoration(
                         labelText: 'Satuan',
                         border: OutlineInputBorder(),
@@ -216,6 +216,7 @@ class _AddItemPageState extends State<AddItemPage> {
                       setState(() {
                         _codeController.text = result;
                       });
+                      if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Kode berhasil di-scan: $result')),
                       );

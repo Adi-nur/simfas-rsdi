@@ -102,7 +102,7 @@ class InventoryRepository {
           .select('*, profiles(full_name), request_items(*, items(*))')
           .eq('status', 'pending')
           .order('created_at', ascending: false);
-      return response as List<Map<String, dynamic>>;
+      return response;
     } catch (e) {
       throw Exception('Gagal memuat daftar permintaan: $e');
     }
@@ -145,6 +145,59 @@ class InventoryRepository {
         'pending_requests': 0,
         'total_value': 0,
       };
+    }
+  }
+
+  // ==========================================
+  // PEMELIHARAAN & KERUSAKAN
+  // ==========================================
+
+  // Ambil semua log pemeliharaan
+  Future<List<Map<String, dynamic>>> getMaintenanceLogs() async {
+    try {
+      final response = await _supabase
+          .from('maintenance_logs')
+          .select('*, items(name), profiles:profiles(full_name)')
+          .order('created_at', ascending: false);
+      return response;
+    } catch (e) {
+      throw Exception('Gagal memuat data pemeliharaan: $e');
+    }
+  }
+
+  // Buat laporan kerusakan baru
+  Future<void> createMaintenanceReport({
+    required int itemId,
+    required String description,
+    required String damageLevel,
+  }) async {
+    try {
+      await _supabase.from('maintenance_logs').insert({
+        'item_id': itemId,
+        'reporter_id': _supabase.auth.currentUser?.id,
+        'description': description,
+        'damage_level': damageLevel,
+        'status': 'pending',
+      });
+    } catch (e) {
+      throw Exception('Gagal membuat laporan kerusakan: $e');
+    }
+  }
+
+  // Update status pemeliharaan
+  Future<void> updateMaintenanceStatus(String id, String status, {double? cost}) async {
+    try {
+      final Map<String, dynamic> updateData = {'status': status};
+      if (status == 'selesai') {
+        updateData['fixed_at'] = DateTime.now().toIso8601String();
+      }
+      if (cost != null) {
+        updateData['cost'] = cost;
+      }
+
+      await _supabase.from('maintenance_logs').update(updateData).eq('id', id);
+    } catch (e) {
+      throw Exception('Gagal memperbarui status: $e');
     }
   }
 }

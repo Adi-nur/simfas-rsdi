@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'transaction_history_page.dart';
+import 'maintenance_page.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_repository.dart';
 import '../services/report_service.dart';
@@ -29,6 +30,15 @@ class StockManagementPage extends StatelessWidget {
           if (auth.canApproveRequests())
             _buildMenuCard(context, 'Persetujuan (Approval)', 'Konfirmasi permintaan dari unit', Icons.fact_check, Colors.teal),
 
+          _buildMenuCard(
+            context,
+            'Pemeliharaan & Kerusakan',
+            'Lapor barang rusak & riwayat servis',
+            Icons.handyman_rounded,
+            Colors.deepOrange,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage())),
+          ),
+
           if (auth.currentRole == UserRole.unitPoli)
             _buildMenuCard(context, 'Permintaan Baru', 'Ajukan kebutuhan barang unit', Icons.add_shopping_cart, Colors.indigo),
 
@@ -46,6 +56,7 @@ class StockManagementPage extends StatelessWidget {
                   final items = await repo.getAllItems();
                   await report.generateInventoryReport(items);
                 } catch (e) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Gagal cetak: $e'), backgroundColor: Colors.red),
                   );

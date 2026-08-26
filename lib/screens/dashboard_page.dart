@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'transaction_history_page.dart';
-import 'item_list_page.dart';
 import 'scanner_page.dart';
 import 'approval_list_page.dart';
+import 'maintenance_page.dart';
+import 'report_damage_page.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_repository.dart';
 import '../models/user_role.dart';
@@ -170,14 +171,22 @@ class _DashboardPageState extends State<DashboardPage> {
                 MaterialPageRoute(builder: (context) => const ScannerPage()),
               );
               if (result != null && result.isNotEmpty) {
+                if (!mounted) return;
                 _handleSearchByCode(context, result);
               }
             }),
             _buildActionItem(context, 'Input Masuk', Icons.login, Colors.green, () => _navigateToHistory(context, 'Log Barang Masuk')),
             _buildActionItem(context, 'Mutasi', Icons.swap_horiz, Colors.orange, () => _navigateToHistory(context, 'Log Mutasi')),
+            _buildActionItem(context, 'Maintenance', Icons.handyman, Colors.deepOrange, () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
+            }),
           ],
-          if (auth.currentRole == UserRole.unitPoli)
+          if (auth.currentRole == UserRole.unitPoli) ...[
             _buildActionItem(context, 'Buat Request', Icons.add_shopping_cart, Colors.blue, () => _navigateToHistory(context, 'Form Permintaan')),
+            _buildActionItem(context, 'Lapor Rusak', Icons.report_problem, Colors.red, () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportDamagePage()));
+            }),
+          ],
           
           if (auth.canApproveRequests())
             _buildActionItem(context, 'Approval', Icons.how_to_reg, Colors.teal, () {
@@ -186,8 +195,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
           _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => _navigateToHistory(context, 'Purchase Order')),
           
-          if (auth.currentRole == UserRole.direktur)
+          if (auth.currentRole == UserRole.direktur) ...[
+            _buildActionItem(context, 'Log Perbaikan', Icons.construction, Colors.orange, () {
+               Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
+            }),
             _buildActionItem(context, 'Laporan Keuangan', Icons.assessment, Colors.red, () => _navigateToHistory(context, 'Laporan Tahunan')),
+          ],
         ],
       ),
     );
@@ -203,7 +216,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final item = await _repo.getItemByCode(code);
-      if (mounted) Navigator.pop(context); // Close loading
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
 
       if (item != null) {
         if (mounted) _showItemDetails(context, item);
@@ -211,6 +225,7 @@ class _DashboardPageState extends State<DashboardPage> {
         if (mounted) _showErrorSnackBar(context, 'Barang dengan kode $code tidak ditemukan di database.');
       }
     } catch (e) {
+      if (!mounted) return;
       if (mounted) Navigator.pop(context);
       if (mounted) _showErrorSnackBar(context, 'Error saat mencari data: $e');
     }
