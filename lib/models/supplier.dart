@@ -16,4 +16,16 @@ class Supplier {
     this.email,
     this.isActive = true,
   });
+
+  factory Supplier.fromMap(Map<String, dynamic> map) {
+    return Supplier(
+      id: map['id']?.toString() ?? '',
+      name: map['name'] ?? '',
+      address: map['address'] ?? '',
+      pic: map['pic'] ?? '',
+      phone: map['phone'] ?? '',
+      email: map['email'],
+      isActive: map['is_active'] ?? true,
+    );
+  }
 }

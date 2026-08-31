@@ -4,6 +4,7 @@ import 'scanner_page.dart';
 import 'approval_list_page.dart';
 import 'maintenance_page.dart';
 import 'report_damage_page.dart';
+import 'purchase_order_page.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_repository.dart';
 import '../models/user_role.dart';
@@ -171,12 +172,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 MaterialPageRoute(builder: (context) => const ScannerPage()),
               );
               if (result != null && result.isNotEmpty) {
-                if (!mounted) return;
+                if (!context.mounted) return;
                 _handleSearchByCode(context, result);
               }
             }),
-            _buildActionItem(context, 'Input Masuk', Icons.login, Colors.green, () => _navigateToHistory(context, 'Log Barang Masuk')),
-            _buildActionItem(context, 'Mutasi', Icons.swap_horiz, Colors.orange, () => _navigateToHistory(context, 'Log Mutasi')),
+            _buildActionItem(context, 'Input Masuk', Icons.login, Colors.green, () => _navigateToHistory(context, 'Log Barang Masuk', 'masuk')),
+            _buildActionItem(context, 'Mutasi', Icons.swap_horiz, Colors.orange, () => _navigateToHistory(context, 'Log Mutasi', 'mutasi')),
             _buildActionItem(context, 'Maintenance', Icons.handyman, Colors.deepOrange, () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
             }),
@@ -193,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage> {
                Navigator.push(context, MaterialPageRoute(builder: (context) => const ApprovalListPage()));
             }),
 
-          _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => _navigateToHistory(context, 'Purchase Order')),
+          _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderPage()))),
           
           if (auth.currentRole == UserRole.direktur) ...[
             _buildActionItem(context, 'Log Perbaikan', Icons.construction, Colors.orange, () {
@@ -216,18 +217,20 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final item = await _repo.getItemByCode(code);
-      if (!mounted) return;
+      if (!context.mounted) return;
       Navigator.pop(context); // Close loading
 
       if (item != null) {
-        if (mounted) _showItemDetails(context, item);
+        if (!context.mounted) return;
+        _showItemDetails(context, item);
       } else {
-        if (mounted) _showErrorSnackBar(context, 'Barang dengan kode $code tidak ditemukan di database.');
+        if (!context.mounted) return;
+        _showErrorSnackBar(context, 'Barang dengan kode $code tidak ditemukan di database.');
       }
     } catch (e) {
-      if (!mounted) return;
-      if (mounted) Navigator.pop(context);
-      if (mounted) _showErrorSnackBar(context, 'Error saat mencari data: $e');
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      _showErrorSnackBar(context, 'Error saat mencari data: $e');
     }
   }
 
@@ -345,8 +348,8 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _navigateToHistory(BuildContext context, String title) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => TransactionHistoryPage(title: title)));
+  void _navigateToHistory(BuildContext context, String title, [String? type]) {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => TransactionHistoryPage(title: title, type: type)));
   }
 
   Widget _buildProfessionalHeader(BuildContext context, AuthService auth) {

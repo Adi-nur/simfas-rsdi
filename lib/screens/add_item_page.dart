@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/inventory_item.dart';
+import '../services/inventory_repository.dart';
 import 'scanner_page.dart';
 
 class AddItemPage extends StatefulWidget {
@@ -11,6 +12,7 @@ class AddItemPage extends StatefulWidget {
 
 class _AddItemPageState extends State<AddItemPage> {
   final _formKey = GlobalKey<FormState>();
+  final _repo = InventoryRepository();
   
   // Controllers
   final _nameController = TextEditingController();
@@ -20,11 +22,14 @@ class _AddItemPageState extends State<AddItemPage> {
   final _minStockController = TextEditingController();
   final _batchController = TextEditingController();
   final _merkController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _supplierController = TextEditingController();
   
   DateTime? _selectedExpiredDate;
   ItemCategory _selectedCategory = ItemCategory.obat;
   String _selectedUnit = 'Strip';
   final List<String> _units = ['Strip', 'Box', 'Pcs', 'Botol', 'Vial', 'Tablet'];
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -35,7 +40,46 @@ class _AddItemPageState extends State<AddItemPage> {
     _minStockController.dispose();
     _batchController.dispose();
     _merkController.dispose();
+    _locationController.dispose();
+    _supplierController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await _repo.addItem({
+        'name': _nameController.text.trim(),
+        'code': _codeController.text.trim(),
+        'category': _selectedCategory.name,
+        'unit': _selectedUnit,
+        'price': double.tryParse(_priceController.text) ?? 0,
+        'stock': int.tryParse(_stockController.text) ?? 0,
+        'min_stock': int.tryParse(_minStockController.text) ?? 0,
+        'batch_number': _batchController.text.trim(),
+        'merk': _merkController.text.trim(),
+        'location': _locationController.text.trim(),
+        'supplier': _supplierController.text.trim(),
+        'expired_date': _selectedExpiredDate?.toIso8601String(),
+      });
+
+      if (context.mounted) {
+        Navigator.pop(context, true);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Barang berhasil disimpan'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -70,6 +114,7 @@ class _AddItemPageState extends State<AddItemPage> {
                         labelText: 'Kode Barang',
                         border: OutlineInputBorder(),
                       ),
+                      validator: (value) => value == null || value.isEmpty ? 'Kode wajib diisi' : null,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -155,6 +200,7 @@ class _AddItemPageState extends State<AddItemPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -232,15 +278,22 @@ class _AddItemPageState extends State<AddItemPage> {
               const SizedBox(height: 24),
               const Text('Lokasi & Supplier', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const ListTile(
-                leading: Icon(Icons.location_on),
-                title: Text('Pilih Lokasi Penyimpanan'),
-                trailing: Icon(Icons.chevron_right),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Lokasi Penyimpanan',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.location_on),
+                ),
               ),
-              const ListTile(
-                leading: Icon(Icons.business),
-                title: Text('Pilih Supplier'),
-                trailing: Icon(Icons.chevron_right),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _supplierController,
+                decoration: const InputDecoration(
+                  labelText: 'Nama Supplier',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                ),
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -251,13 +304,10 @@ class _AddItemPageState extends State<AddItemPage> {
                     backgroundColor: const Color(0xFF0D47A1),
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // Save item logic
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text('Simpan Barang', style: TextStyle(fontSize: 16)),
+                  onPressed: _isSaving ? null : _handleSave,
+                  child: _isSaving 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Simpan Barang', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],

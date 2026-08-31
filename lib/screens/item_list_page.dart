@@ -160,8 +160,11 @@ class _ItemListPageState extends State<ItemListPage> {
                       ),
                     ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddItemPage()));
+        onPressed: () async {
+          final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddItemPage()));
+          if (result == true) {
+            _fetchItems();
+          }
         },
         backgroundColor: const Color(0xFF0D47A1),
         foregroundColor: Colors.white,

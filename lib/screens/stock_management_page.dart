@@ -89,7 +89,13 @@ class StockManagementPage extends StatelessWidget {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.chevron_right),
-        onTap: onTap ?? () => Navigator.push(context, MaterialPageRoute(builder: (context) => TransactionHistoryPage(title: title))),
+        onTap: onTap ?? () {
+          String? type;
+          if (title.contains('Masuk') || title.contains('Penerimaan')) type = 'masuk';
+          if (title.contains('Keluar') || title.contains('Pengeluaran')) type = 'keluar';
+          if (title.contains('Mutasi')) type = 'mutasi';
+          Navigator.push(context, MaterialPageRoute(builder: (context) => TransactionHistoryPage(title: title, type: type)));
+        },
       ),
     );
   }
