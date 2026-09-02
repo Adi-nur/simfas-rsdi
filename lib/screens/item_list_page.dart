@@ -3,6 +3,7 @@ import '../models/inventory_item.dart';
 import 'add_item_page.dart';
 
 import '../services/inventory_repository.dart';
+import '../services/auth_service.dart';
 
 class ItemListPage extends StatefulWidget {
   const ItemListPage({super.key});
@@ -12,6 +13,7 @@ class ItemListPage extends StatefulWidget {
 }
 
 class _ItemListPageState extends State<ItemListPage> {
+  final AuthService _auth = AuthService();
   final InventoryRepository _repo = InventoryRepository();
   List<InventoryItem> _items = [];
   bool _isLoading = true;
@@ -40,6 +42,46 @@ class _ItemListPageState extends State<ItemListPage> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  void _confirmDelete(InventoryItem item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Barang'),
+        content: Text('Apakah Anda yakin ingin menghapus "${item.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteItem(item.id);
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteItem(String id) async {
+    try {
+      await _repo.deleteItem(id);
+      _fetchItems();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Barang berhasil dihapus'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -127,30 +169,43 @@ class _ItemListPageState extends State<ItemListPage> {
                                   ),
                                 ],
                               ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    '${item.stock} ${item.unit}',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: isLowStock ? Colors.red : const Color(0xFF0F172A),
-                                    ),
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '${item.stock} ${item.unit}',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: isLowStock ? Colors.red : const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      if (isLowStock)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            'LOW STOCK',
+                                            style: TextStyle(color: Colors.red, fontSize: 8, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                  if (isLowStock)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text(
-                                        'LOW STOCK',
-                                        style: TextStyle(color: Colors.red, fontSize: 8, fontWeight: FontWeight.bold),
-                                      ),
+                                  if (_auth.canAccessMasterData()) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      onPressed: () => _confirmDelete(item),
+                                      tooltip: 'Hapus Barang',
                                     ),
+                                  ],
                                 ],
                               ),
                               onTap: () {},

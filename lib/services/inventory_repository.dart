@@ -29,6 +29,15 @@ class InventoryRepository {
     }
   }
 
+  // Hapus barang
+  Future<void> deleteItem(String itemId) async {
+    try {
+      await _supabase.from('items').delete().eq('id', itemId);
+    } catch (e) {
+      throw Exception('Gagal menghapus barang: $e');
+    }
+  }
+
   // Mencari barang berdasarkan Barcode (Integrasi dengan Scanner)
   Future<Map<String, dynamic>?> getItemByCode(String code) async {
     try {

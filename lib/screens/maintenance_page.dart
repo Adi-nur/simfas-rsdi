@@ -267,10 +267,19 @@ class _MaintenancePageState extends State<MaintenancePage> {
                 if (log.auditLog != null && log.auditLog!.isNotEmpty) ...[
                   const Divider(),
                   const Text('Riwayat Audit:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-                  ...log.auditLog!.map((e) => Text(
-                    '• ${DateFormat('HH:mm').format(DateTime.parse(e['timestamp']))}: ${e['action']}',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  )),
+                  ...log.auditLog!.map((e) {
+                    String time = "";
+                    try {
+                      if (e['timestamp'] != null) {
+                        time = DateFormat('HH:mm').format(DateTime.parse(e['timestamp'].toString()));
+                      }
+                    } catch (_) {}
+                    
+                    return Text(
+                      '• $time: ${e['action'] ?? 'Aktivitas tidak tercatat'}',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    );
+                  }),
                 ]
               ],
             ),

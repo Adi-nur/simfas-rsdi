@@ -41,25 +41,41 @@ class MaintenanceLog {
   });
 
   factory MaintenanceLog.fromMap(Map<String, dynamic> map) {
+    // Helper untuk mengambil data dari join (antisipasi jika Supabase mengembalikan List atau Object)
+    String? getJoinField(dynamic joinData, String field) {
+      if (joinData == null) return null;
+      if (joinData is List && joinData.isNotEmpty) {
+        return joinData[0][field]?.toString();
+      }
+      if (joinData is Map) {
+        return joinData[field]?.toString();
+      }
+      return null;
+    }
+
     return MaintenanceLog(
-      id: map['id'],
-      itemId: map['item_id'].toString(),
-      itemName: map['items']?['name'] ?? 'Barang Tanpa Nama',
-      reporterName: map['profiles']?['full_name'] ?? 'Anonim',
-      description: map['description'] ?? '',
-      damageLevel: _parseDamageLevel(map['damage_level']),
-      status: _parseStatus(map['status']),
-      cost: (map['cost'] ?? 0).toDouble(),
-      createdAt: DateTime.parse(map['created_at']),
-      fixedAt: map['fixed_at'] != null ? DateTime.parse(map['fixed_at']) : null,
+      id: map['id']?.toString() ?? '',
+      itemId: map['item_id']?.toString() ?? '',
+      itemName: getJoinField(map['items'], 'name') ?? 'Barang Tanpa Nama',
+      reporterName: getJoinField(map['profiles'], 'full_name') ?? 'Anonim',
+      description: map['description']?.toString() ?? '',
+      damageLevel: _parseDamageLevel(map['damage_level']?.toString()),
+      status: _parseStatus(map['status']?.toString()),
+      cost: double.tryParse(map['cost']?.toString() ?? '0.0') ?? 0.0,
+      createdAt: map['created_at'] != null 
+          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      fixedAt: map['fixed_at'] != null ? DateTime.tryParse(map['fixed_at'].toString()) : null,
       
       // Parsing Fitur Baru
-      photoUrl: map['photo_url'],
-      location: map['location'],
-      assignedToId: map['assigned_to'],
-      assignedToName: map['assignee']?['full_name'], // Asumsi join profile assignee
-      estimatedFinish: map['estimated_finish'] != null ? DateTime.parse(map['estimated_finish']) : null,
-      auditLog: map['audit_log'],
+      photoUrl: map['photo_url']?.toString(),
+      location: map['location']?.toString(),
+      assignedToId: map['assigned_to']?.toString(),
+      assignedToName: getJoinField(map['assignee'], 'full_name'),
+      estimatedFinish: map['estimated_finish'] != null 
+          ? DateTime.tryParse(map['estimated_finish'].toString()) 
+          : null,
+      auditLog: map['audit_log'] is List ? map['audit_log'] : [],
     );
   }
 
