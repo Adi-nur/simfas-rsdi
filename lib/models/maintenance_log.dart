@@ -57,7 +57,7 @@ class MaintenanceLog {
       id: map['id']?.toString() ?? '',
       itemId: map['item_id']?.toString() ?? '',
       itemName: getJoinField(map['items'], 'name') ?? 'Barang Tanpa Nama',
-      reporterName: getJoinField(map['profiles'], 'full_name') ?? 'Anonim',
+      reporterName: getJoinField(map['reporter'], 'full_name') ?? 'Anonim',
       description: map['description']?.toString() ?? '',
       damageLevel: _parseDamageLevel(map['damage_level']?.toString()),
       status: _parseStatus(map['status']?.toString()),

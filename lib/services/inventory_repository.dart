@@ -226,11 +226,20 @@ class InventoryRepository {
   // Ambil profil staf untuk penugasan
   Future<List<Map<String, dynamic>>> getStaffProfiles() async {
     try {
+      // Ambil semua profil terlebih dahulu untuk pengecekan
       final response = await _supabase
           .from('profiles')
-          .select('id, full_name, role')
-          .inFilter('role', ['super_admin', 'petugas_gudang', 'kepala_gudang']);
-      return response;
+          .select('id, full_name, role');
+      
+      // Filter di sisi aplikasi agar lebih fleksibel dan mudah di-debug
+      final staff = (response as List).where((u) {
+        final role = u['role']?.toString().toLowerCase() ?? '';
+        return role == 'super_admin' || 
+               role == 'petugas_gudang' || 
+               role == 'kepala_gudang';
+      }).toList();
+
+      return staff.cast<Map<String, dynamic>>();
     } catch (e) {
       throw Exception('Gagal memuat profil staf: $e');
     }
@@ -242,9 +251,15 @@ class InventoryRepository {
 
   Future<List<Map<String, dynamic>>> getMaintenanceLogs() async {
     try {
+      // Menggunakan join yang lebih sederhana jika FK alias bermasalah
       final response = await _supabase
           .from('maintenance_logs')
-          .select('*, items(name), profiles:profiles!maintenance_logs_reporter_id_fkey(full_name), assignee:profiles!maintenance_logs_assigned_to_fkey(full_name)')
+          .select('''
+            *,
+            items(name),
+            reporter:profiles!maintenance_logs_reporter_id_fkey(full_name),
+            assignee:profiles!maintenance_logs_assigned_to_fkey(full_name)
+          ''')
           .order('created_at', ascending: false);
       return response;
     } catch (e) {

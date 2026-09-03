@@ -294,6 +294,18 @@ class _MaintenancePageState extends State<MaintenancePage> {
       final staff = await _repo.getStaffProfiles();
       if (!mounted) return;
       
+      if (staff.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Data Petugas Kosong'),
+            content: const Text('Tidak ditemukan user dengan role Petugas Gudang atau Admin di database. Silakan pastikan role user sudah diatur di tabel profiles.'),
+            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+          ),
+        );
+        return;
+      }
+
       Map<String, dynamic>? selectedStaff;
       DateTime selectedDate = DateTime.now().add(const Duration(days: 3));
 
@@ -371,9 +383,18 @@ class _MaintenancePageState extends State<MaintenancePage> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final cost = double.tryParse(costController.text) ?? 0;
               Navigator.pop(context);
+              
+              // Jika belum ditugaskan, otomatis tugaskan ke user yang menyelesaikan
+              if (log.assignedToId == null || log.assignedToId!.isEmpty) {
+                final currentUserId = _auth.currentUser?.id;
+                if (currentUserId != null) {
+                  await _repo.assignMaintenance(log.id, currentUserId, DateTime.now());
+                }
+              }
+
               _updateStatus(log.id, 'selesai', cost: cost, auditEntry: {'action': 'Perbaikan Selesai (Biaya: Rp $cost)'});
             },
             child: const Text('Simpan'),
