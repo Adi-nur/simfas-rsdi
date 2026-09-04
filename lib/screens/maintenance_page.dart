@@ -317,15 +317,64 @@ class _MaintenancePageState extends State<MaintenancePage> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<Map<String, dynamic>>(
-                  decoration: const InputDecoration(labelText: 'Pilih Petugas'),
-                  items: staff.map((s) => DropdownMenuItem(value: s, child: Text(s['full_name']))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedStaff = v),
+                // Pencarian Petugas dengan Pengetikan (Autocomplete)
+                Autocomplete<Map<String, dynamic>>(
+                  displayStringForOption: (option) => option['full_name'],
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return staff;
+                    }
+                    return staff.where((s) => s['full_name']
+                        .toString()
+                        .toLowerCase()
+                        .contains(textEditingValue.text.toLowerCase()));
+                  },
+                  onSelected: (Map<String, dynamic> selection) {
+                    setDialogState(() => selectedStaff = selection);
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Ketik Nama Petugas',
+                        prefixIcon: Icon(Icons.person_search),
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        child: SizedBox(
+                          width: 280, // Sesuaikan dengan lebar dialog
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final Map<String, dynamic> option = options.elementAt(index);
+                              return ListTile(
+                                title: Text(option['full_name']),
+                                subtitle: Text(option['role'].toString().replaceAll('_', ' ')),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  title: const Text('Estimasi Selesai'),
-                  subtitle: Text(DateFormat('dd MMMM yyyy').format(selectedDate)),
+                  tileColor: Colors.grey.withOpacity(0.05),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  title: const Text('Estimasi Selesai', style: TextStyle(fontSize: 12)),
+                  subtitle: Text(DateFormat('dd MMMM yyyy').format(selectedDate), style: const TextStyle(fontWeight: FontWeight.bold)),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
                     final picked = await showDatePicker(
