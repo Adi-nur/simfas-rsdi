@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:typed_data';
 
 class InventoryRepository {
   final _supabase = Supabase.instance.client;
@@ -26,6 +27,23 @@ class InventoryRepository {
       await _supabase.from('items').insert(itemData);
     } catch (e) {
       throw Exception('Gagal menambah barang: $e');
+    }
+  }
+
+  // Upload Foto ke Supabase Storage
+  Future<String?> uploadMaintenancePhoto(String path, List<int> bytes, String fileName) async {
+    try {
+      final String fullPath = 'maintenance/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+      
+      await _supabase.storage.from('inventory_assets').uploadBinary(
+        fullPath,
+        Uint8List.fromList(bytes),
+      );
+
+      final String publicUrl = _supabase.storage.from('inventory_assets').getPublicUrl(fullPath);
+      return publicUrl;
+    } catch (e) {
+      return null;
     }
   }
 

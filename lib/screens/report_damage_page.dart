@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/inventory_repository.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 
 class ReportDamagePage extends StatefulWidget {
   const ReportDamagePage({super.key});
@@ -13,11 +15,15 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
   final _repo = InventoryRepository();
   final _descController = TextEditingController();
   final _locationController = TextEditingController();
+  final _picker = ImagePicker();
   
   List<Map<String, dynamic>> _items = [];
   Map<String, dynamic>? _selectedItem;
   String _damageLevel = 'ringan';
-  String? _photoUrl; // Placeholder for uploaded photo URL
+  
+  XFile? _pickedFile;
+  Uint8List? _webImage;
+  String? _photoUrl; 
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -61,7 +67,6 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
         final item = await _repo.getItemByCode(result);
         if (item != null) {
           setState(() {
-            // Find item in local list to ensure reference equality for Dropdown
             _selectedItem = _items.firstWhere((element) => element['id'] == item['id'], orElse: () => item);
           });
         } else {
@@ -76,10 +81,22 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
   }
 
   Future<void> _pickPhoto() async {
-    // Implementasi image_picker akan ditambahkan di sini
-    // Untuk saat ini, kita beri simulasi
-    setState(() => _photoUrl = "https://example.com/mock-photo.jpg");
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Foto ditambahkan (Simulasi)')));
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 50,
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _pickedFile = image;
+          _webImage = bytes;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal mengambil foto: $e')));
+    }
   }
 
   Future<void> _submitReport() async {
@@ -90,6 +107,16 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
 
     setState(() => _isSaving = true);
     try {
+      // Upload foto jika ada
+      if (_pickedFile != null && _webImage != null) {
+        final uploadedUrl = await _repo.uploadMaintenancePhoto(
+          _pickedFile!.path, 
+          _webImage!, 
+          _pickedFile!.name
+        );
+        _photoUrl = uploadedUrl;
+      }
+
       await _repo.createMaintenanceReport(
         itemId: _selectedItem!['id'],
         description: _descController.text,
@@ -97,9 +124,9 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
         location: _locationController.text,
         photoUrl: _photoUrl,
       );
+      
       if (mounted) {
         Navigator.pop(context);
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Laporan dikirim'), backgroundColor: Colors.green));
       }
     } catch (e) {
@@ -182,17 +209,36 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
                   InkWell(
                     onTap: _pickPhoto,
                     child: Container(
-                      height: 120,
+                      height: 150,
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey[300]!),
                       ),
-                      child: _photoUrl != null 
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(_photoUrl!, fit: BoxFit.cover),
+                      child: _webImage != null 
+                        ? Stack(
+                            children: [
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.memory(_webImage!, fit: BoxFit.cover),
+                                ),
+                              ),
+                              Positioned(
+                                top: 8, right: 8,
+                                child: CircleAvatar(
+                                  backgroundColor: Colors.black54,
+                                  child: IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.white),
+                                    onPressed: () => setState(() {
+                                      _pickedFile = null;
+                                      _webImage = null;
+                                    }),
+                                  ),
+                                ),
+                              )
+                            ],
                           )
                         : const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
