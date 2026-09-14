@@ -109,12 +109,20 @@ class _ReportDamagePageState extends State<ReportDamagePage> {
     try {
       // Upload foto jika ada
       if (_pickedFile != null && _webImage != null) {
-        final uploadedUrl = await _repo.uploadMaintenancePhoto(
-          _pickedFile!.path, 
-          _webImage!, 
-          _pickedFile!.name
-        );
-        _photoUrl = uploadedUrl;
+        try {
+          final uploadedUrl = await _repo.uploadMaintenancePhoto(
+            _pickedFile!.path, 
+            _webImage!, 
+            _pickedFile!.name
+          );
+          _photoUrl = uploadedUrl;
+        } catch (uploadError) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal Unggah Foto: $uploadError'), backgroundColor: Colors.orange),
+          );
+          // Lanjut simpan tanpa foto jika diinginkan, atau return jika foto wajib
+        }
       }
 
       await _repo.createMaintenanceReport(

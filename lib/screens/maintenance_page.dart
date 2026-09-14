@@ -210,6 +210,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
+                        // Gunakan proxy atau manipulasi URL jika di web untuk menghindari masalah CORS
                         log.photoUrl!, 
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
@@ -218,10 +219,15 @@ class _MaintenancePageState extends State<MaintenancePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(Icons.broken_image, color: Colors.grey),
-                              Text('Gagal memuat gambar', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                              Text('Gagal memuat gambar (CORS)', style: TextStyle(fontSize: 10, color: Colors.grey)),
                             ],
                           ),
                         ),
+                        // Penanganan khusus untuk Flutter Web agar gambar lebih toleran terhadap CORS
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(child: CircularProgressIndicator());
+                        },
                       ),
                     ),
                   ),

@@ -30,7 +30,7 @@ class InventoryRepository {
     }
   }
 
-  // Upload Foto ke Supabase Storage
+  // Upload Foto ke Supabase Storage dengan error handling lebih baik
   Future<String?> uploadMaintenancePhoto(String path, List<int> bytes, String fileName) async {
     try {
       final String fullPath = 'maintenance/${DateTime.now().millisecondsSinceEpoch}_$fileName';
@@ -38,12 +38,15 @@ class InventoryRepository {
       await _supabase.storage.from('inventory_assets').uploadBinary(
         fullPath,
         Uint8List.fromList(bytes),
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
       );
 
       final String publicUrl = _supabase.storage.from('inventory_assets').getPublicUrl(fullPath);
+      // Jangan gunakan timestamp jika itu merusak CORS di beberapa browser
       return publicUrl;
     } catch (e) {
-      return null;
+      print('DEBUG STORAGE ERROR: $e');
+      rethrow; // Biarkan UI menangkap error untuk ditampilkan
     }
   }
 
@@ -249,12 +252,10 @@ class InventoryRepository {
           .from('profiles')
           .select('id, full_name, role');
       
-      // Filter di sisi aplikasi agar lebih fleksibel dan mudah di-debug
+      // Filter di sisi aplikasi agar hanya menampilkan Petugas Gudang
       final staff = (response as List).where((u) {
         final role = u['role']?.toString().toLowerCase() ?? '';
-        return role == 'super_admin' || 
-               role == 'petugas_gudang' || 
-               role == 'kepala_gudang';
+        return role == 'petugas_gudang';
       }).toList();
 
       return staff.cast<Map<String, dynamic>>();
