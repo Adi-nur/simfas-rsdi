@@ -7,6 +7,7 @@ import 'screens/stock_management_page.dart';
 import 'screens/login_page.dart';
 import 'screens/transaction_history_page.dart';
 import 'services/auth_service.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,6 +84,11 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _buildNavigationItems();
+    
+    // Inisialisasi Notifikasi Realtime
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().init(context);
+    });
   }
 
   /// Membuat menu dan halaman berdasarkan role user.

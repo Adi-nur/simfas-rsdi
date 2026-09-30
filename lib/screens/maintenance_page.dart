@@ -9,7 +9,9 @@ import 'package:intl/intl.dart';
 import 'maintenance_analytics_screen.dart';
 
 class MaintenancePage extends StatefulWidget {
-  const MaintenancePage({super.key});
+  final MaintenanceStatus? initialStatus;
+
+  const MaintenancePage({super.key, this.initialStatus});
 
   @override
   State<MaintenancePage> createState() => _MaintenancePageState();
@@ -27,6 +29,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
   @override
   void initState() {
     super.initState();
+    _statusFilter = widget.initialStatus;
     _fetchLogs();
   }
 

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'transaction_history_page.dart';
 import 'scanner_page.dart';
 import 'approval_list_page.dart';
 import 'maintenance_page.dart';
 import 'report_damage_page.dart';
 import 'purchase_order_page.dart';
+import 'master_data_page.dart';
+import 'user_management_page.dart';
+import 'item_list_page.dart';
 import '../services/auth_service.dart';
 import '../services/inventory_repository.dart';
 import '../models/user_role.dart';
+import '../models/maintenance_log.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -24,8 +30,10 @@ class _DashboardPageState extends State<DashboardPage> {
     'total_items': 0,
     'low_stock': 0,
     'pending_requests': 0,
+    'pending_maintenance': 0,
     'total_value': 0,
   };
+  List<Map<String, dynamic>> _activities = [];
   bool _isLoading = true;
 
   @override
@@ -37,13 +45,49 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadDashboardData() async {
     setState(() => _isLoading = true);
     try {
-      final stats = await _repo.getDashboardStats();
+      final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+      final currentRole = _auth.currentRole?.name;
+
+      final results = await Future.wait([
+        _repo.getDashboardStats(),
+        _repo.getRecentActivities(
+          userId: currentUserId,
+          role: currentRole,
+        ),
+      ]);
+
+      if (!mounted) return;
       setState(() {
-        _stats = stats;
+        _stats = results[0] as Map<String, dynamic>;
+        _activities = results[1] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatCurrency(dynamic value) {
+    final num numValue = (value is num) ? value : (num.tryParse(value.toString()) ?? 0);
+    final formatter = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    return formatter.format(numValue);
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Baru saja';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} mnt lalu';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours} jam lalu';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} hr lalu';
+    } else {
+      return DateFormat('dd MMM yyyy').format(dateTime);
     }
   }
 
@@ -105,6 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildSectionTitle(BuildContext context, AuthService auth) {
     String title = 'Ringkasan Logistik';
+    if (auth.currentRole == UserRole.superAdmin) title = 'Ringkasan Logistik & Sistem';
     if (auth.currentRole == UserRole.direktur) title = 'Ringkasan Eksekutif';
     if (auth.currentRole == UserRole.unitPoli) title = 'Status Permintaan Unit';
 
@@ -126,9 +171,68 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildDynamicStatsGrid(BuildContext context, AuthService auth) {
     List<Widget> cards = [];
 
-    if (auth.currentRole == UserRole.direktur) {
+    Future<void> openPendingMaintenance() async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MaintenancePage(initialStatus: MaintenanceStatus.pending),
+        ),
+      );
+      _loadDashboardData();
+    }
+
+    void openInventory() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ItemListPage()),
+      );
+    }
+
+    if (auth.currentRole == UserRole.superAdmin) {
       cards = [
-        _buildStatCard(context, 'Total Aset', 'Rp ${_stats['total_value']}', Icons.account_balance_wallet, Colors.blue),
+        _buildStatCard(
+          context,
+          'Total Item',
+          '${_stats['total_items']}',
+          Icons.inventory_2,
+          Colors.blue,
+          onTap: openInventory,
+        ),
+        _buildStatCard(
+          context,
+          'Total Aset',
+          _formatCurrency(_stats['total_value']),
+          Icons.account_balance_wallet,
+          Colors.teal,
+          onTap: openInventory,
+        ),
+        _buildStatCard(
+          context,
+          'Stok Kritis',
+          '${_stats['low_stock']}',
+          Icons.report_problem,
+          Colors.red,
+          onTap: openInventory,
+        ),
+        _buildStatCard(
+          context,
+          'Req Pending',
+          '${_stats['pending_requests']}',
+          Icons.pending_actions,
+          Colors.orange,
+          onTap: openPendingMaintenance,
+        ),
+      ];
+    } else if (auth.currentRole == UserRole.direktur) {
+      cards = [
+        _buildStatCard(
+          context,
+          'Total Aset',
+          _formatCurrency(_stats['total_value']),
+          Icons.account_balance_wallet,
+          Colors.blue,
+          onTap: openInventory,
+        ),
         _buildStatCard(context, 'Efisiensi Stok', '92%', Icons.trending_up, Colors.green),
         _buildStatCard(context, 'Stok Mati', '0', Icons.layers_clear, Colors.red),
         _buildStatCard(context, 'Vendor Aktif', '-', Icons.handshake, Colors.orange),
@@ -136,16 +240,51 @@ class _DashboardPageState extends State<DashboardPage> {
     } else if (auth.currentRole == UserRole.unitPoli) {
       cards = [
         _buildStatCard(context, 'Permintaan Selesai', '-', Icons.check_circle, Colors.green),
-        _buildStatCard(context, 'Menunggu Approval', '${_stats['pending_requests']}', Icons.pending, Colors.orange),
+        _buildStatCard(
+          context,
+          'Menunggu Approval',
+          '${_stats['pending_requests']}',
+          Icons.pending,
+          Colors.orange,
+          onTap: openPendingMaintenance,
+        ),
         _buildStatCard(context, 'Ditolak/Revisi', '0', Icons.cancel, Colors.red),
-        _buildStatCard(context, 'Item Tersedia', '${_stats['total_items']}', Icons.inventory, Colors.blue),
+        _buildStatCard(
+          context,
+          'Item Tersedia',
+          '${_stats['total_items']}',
+          Icons.inventory,
+          Colors.blue,
+          onTap: openInventory,
+        ),
       ];
     } else {
       cards = [
-        _buildStatCard(context, 'Total Item', '${_stats['total_items']}', Icons.inventory_2, Colors.blue),
-        _buildStatCard(context, 'Stok Kritis', '${_stats['low_stock']}', Icons.report_problem, Colors.red),
+        _buildStatCard(
+          context,
+          'Total Item',
+          '${_stats['total_items']}',
+          Icons.inventory_2,
+          Colors.blue,
+          onTap: openInventory,
+        ),
+        _buildStatCard(
+          context,
+          'Stok Kritis',
+          '${_stats['low_stock']}',
+          Icons.report_problem,
+          Colors.red,
+          onTap: openInventory,
+        ),
         _buildStatCard(context, 'Expired (30hr)', '0', Icons.timer, Colors.orange),
-        _buildStatCard(context, 'Req Pending', '${_stats['pending_requests']}', Icons.pending_actions, Colors.green),
+        _buildStatCard(
+          context,
+          'Req Pending',
+          '${_stats['pending_requests']}',
+          Icons.pending_actions,
+          Colors.orange,
+          onTap: openPendingMaintenance,
+        ),
       ];
     }
 
@@ -165,7 +304,7 @@ class _DashboardPageState extends State<DashboardPage> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          if (auth.canManageStock()) ...[
+          if (auth.currentRole == UserRole.superAdmin) ...[
             _buildActionItem(context, 'Scan', Icons.qr_code_scanner, Colors.indigo, () async {
               final result = await Navigator.push<String>(
                 context,
@@ -178,29 +317,54 @@ class _DashboardPageState extends State<DashboardPage> {
             }),
             _buildActionItem(context, 'Input Masuk', Icons.login, Colors.green, () => _navigateToHistory(context, 'Log Barang Masuk', 'masuk')),
             _buildActionItem(context, 'Mutasi', Icons.swap_horiz, Colors.orange, () => _navigateToHistory(context, 'Log Mutasi', 'mutasi')),
+            _buildActionItem(context, 'Approval', Icons.how_to_reg, Colors.teal, () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ApprovalListPage()));
+            }),
             _buildActionItem(context, 'Maintenance', Icons.handyman, Colors.deepOrange, () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
             }),
-          ],
-          if (auth.currentRole == UserRole.unitPoli) ...[
-            _buildActionItem(context, 'Buat Request', Icons.add_shopping_cart, Colors.blue, () => _navigateToHistory(context, 'Form Permintaan')),
-            _buildActionItem(context, 'Lapor Rusak', Icons.report_problem, Colors.red, () {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportDamagePage()));
+            _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderPage())),),
+            _buildActionItem(context, 'Master Data', Icons.dataset, Colors.blueGrey, () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const MasterDataPage()));
             }),
-          ],
-          
-          if (auth.canApproveRequests())
-            _buildActionItem(context, 'Approval', Icons.how_to_reg, Colors.teal, () {
-               Navigator.push(context, MaterialPageRoute(builder: (context) => const ApprovalListPage()));
+            _buildActionItem(context, 'Kelola User', Icons.people, Colors.blue, () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const UserManagementPage()));
             }),
-
-          _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderPage()))),
-          
-          if (auth.currentRole == UserRole.direktur) ...[
-            _buildActionItem(context, 'Log Perbaikan', Icons.construction, Colors.orange, () {
-               Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
-            }),
-            _buildActionItem(context, 'Laporan Keuangan', Icons.assessment, Colors.red, () => _navigateToHistory(context, 'Laporan Tahunan')),
+          ] else ...[
+            if (auth.canManageStock()) ...[
+              _buildActionItem(context, 'Scan', Icons.qr_code_scanner, Colors.indigo, () async {
+                final result = await Navigator.push<String>(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ScannerPage()),
+                );
+                if (result != null && result.isNotEmpty) {
+                  if (!context.mounted) return;
+                  _handleSearchByCode(context, result);
+                }
+              }),
+              _buildActionItem(context, 'Input Masuk', Icons.login, Colors.green, () => _navigateToHistory(context, 'Log Barang Masuk', 'masuk')),
+              _buildActionItem(context, 'Mutasi', Icons.swap_horiz, Colors.orange, () => _navigateToHistory(context, 'Log Mutasi', 'mutasi')),
+              _buildActionItem(context, 'Maintenance', Icons.handyman, Colors.deepOrange, () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
+              }),
+            ],
+            if (auth.currentRole == UserRole.unitPoli) ...[
+              _buildActionItem(context, 'Buat Request', Icons.add_shopping_cart, Colors.blue, () => _navigateToHistory(context, 'Form Permintaan')),
+              _buildActionItem(context, 'Lapor Rusak', Icons.report_problem, Colors.red, () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportDamagePage()));
+              }),
+            ],
+            if (auth.canApproveRequests())
+              _buildActionItem(context, 'Approval', Icons.how_to_reg, Colors.teal, () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const ApprovalListPage()));
+              }),
+            _buildActionItem(context, 'Purchase', Icons.shopping_cart, Colors.purple, () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderPage())),),
+            if (auth.currentRole == UserRole.direktur) ...[
+              _buildActionItem(context, 'Log Perbaikan', Icons.construction, Colors.orange, () {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const MaintenancePage()));
+              }),
+              _buildActionItem(context, 'Laporan Keuangan', Icons.assessment, Colors.red, () => _navigateToHistory(context, 'Laporan Tahunan')),
+            ],
           ],
         ],
       ),
@@ -319,31 +483,42 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-              Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-            ],
-          )
-        ],
+  Widget _buildStatCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -423,7 +598,24 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildModernActivityList(BuildContext context, AuthService auth) {
-    String activityText = auth.currentRole == UserRole.unitPoli ? 'Permintaan disetujui' : 'Barang masuk dari supplier';
+    if (_activities.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Center(
+          child: Text(
+            'Belum ada aktivitas terbaru.',
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -433,13 +625,50 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
+        itemCount: _activities.length,
         separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) => ListTile(
-          leading: const Icon(Icons.circle, size: 12, color: Colors.blue),
-          title: Text(activityText, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-          subtitle: const Text('Baru saja', style: TextStyle(fontSize: 11)),
-        ),
+        itemBuilder: (context, index) {
+          final act = _activities[index];
+          final type = act['type']?.toString();
+          final createdAt = act['created_at'] as DateTime? ?? DateTime.now();
+
+          IconData icon = Icons.notifications_active_outlined;
+          Color color = Colors.blue;
+
+          if (type == 'masuk') {
+            icon = Icons.south_west_rounded;
+            color = Colors.green;
+          } else if (type == 'keluar') {
+            icon = Icons.north_east_rounded;
+            color = Colors.red;
+          } else if (type == 'mutasi') {
+            icon = Icons.swap_horiz_rounded;
+            color = Colors.orange;
+          } else if (type == 'maintenance') {
+            icon = Icons.build_circle_outlined;
+            color = Colors.deepOrange;
+          }
+
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            title: Text(
+              act['title'] ?? 'Aktivitas',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            subtitle: Text(
+              '${act['subtitle']} • ${_timeAgo(createdAt)}',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            ),
+          );
+        },
       ),
     );
   }

@@ -424,12 +424,240 @@ class _UserManagementPageState extends State<UserManagementPage> {
           ),
         ),
 
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: Color(0xFF94A3B8),
-        ),
+        onTap: () => _showUserDetail(user),
       ),
     );
+  }
+
+  // ==========================================================
+  // USER DETAIL & OPTIONS
+  // ==========================================================
+
+  void _showUserDetail(Map<String, dynamic> user) {
+    final String name = (user['full_name'] ?? 'Tanpa Nama').toString();
+    final String role = (user['role'] ?? '').toString();
+    final Color roleColor = _roleColor(role);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: roleColor.withValues(alpha: 0.1),
+                child: Icon(_roleIcon(role), color: roleColor, size: 40),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                name,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                _roleLabel(role),
+                style: TextStyle(color: roleColor, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 32),
+              
+              // Actions
+              _buildActionTile(
+                icon: Icons.edit_outlined,
+                label: 'Edit Profil User',
+                color: Colors.blue,
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditUserDialog(user);
+                },
+              ),
+              const Divider(),
+              _buildActionTile(
+                icon: Icons.delete_outline,
+                label: 'Hapus User',
+                color: Colors.red,
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteUser(user);
+                },
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tutup', style: TextStyle(color: Colors.grey)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionTile({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  // ==========================================================
+  // EDIT USER DIALOG
+  // ==========================================================
+
+  void _showEditUserDialog(Map<String, dynamic> user) {
+    final nameController = TextEditingController(text: user['full_name']);
+    UserRole selectedRole = _mapStringToRole(user['role']);
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24, right: 24, top: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Edit User', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 24),
+                  const Text('Nama Lengkap', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Role Akses', style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<UserRole>(
+                    value: selectedRole,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: UserRole.values.map((role) {
+                      return DropdownMenuItem(value: role, child: Text(_roleLabel(_roleToString(role))));
+                    }).toList(),
+                    onChanged: (v) => setModalState(() => selectedRole = v!),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D47A1),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: isSaving ? null : () async {
+                        setModalState(() => isSaving = true);
+                        try {
+                          await _supabase.from('profiles').update({
+                            'full_name': nameController.text.trim(),
+                            'role': _roleToString(selectedRole),
+                          }).eq('id', user['id']);
+                          
+                          if (!mounted) return;
+                          Navigator.pop(sheetContext);
+                          _fetchUsers();
+                          _showSnackBar('User berhasil diperbarui');
+                        } catch (e) {
+                          setModalState(() => isSaving = false);
+                          _showSnackBar('Gagal update: $e', isError: true);
+                        }
+                      },
+                      child: isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text('SIMPAN PERUBAHAN'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ==========================================================
+  // DELETE USER
+  // ==========================================================
+
+  void _confirmDeleteUser(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus User'),
+        content: Text('Apakah Anda yakin ingin menghapus "${user['full_name']}"? User ini tidak akan bisa login lagi.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                // Hapus di profiles (cascade atau trigger biasanya menangani auth.users)
+                // Catatan: Di Supabase, menghapus row di profile biasanya tidak otomatis menghapus di auth.users
+                // Kecuali ada trigger khusus. Di sini kita hapus profilnya saja.
+                await _supabase.from('profiles').delete().eq('id', user['id']);
+                _fetchUsers();
+                _showSnackBar('User berhasil dihapus');
+              } catch (e) {
+                _showSnackBar('Gagal menghapus: $e', isError: true);
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  UserRole _mapStringToRole(String role) {
+    switch (role) {
+      case 'super_admin': return UserRole.superAdmin;
+      case 'kepala_gudang': return UserRole.kepalaGudang;
+      case 'petugas_gudang': return UserRole.petugasGudang;
+      case 'unit_poli': return UserRole.unitPoli;
+      case 'direktur': return UserRole.direktur;
+      default: return UserRole.unitPoli;
+    }
   }
 
   // ==========================================================

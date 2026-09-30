@@ -99,6 +99,24 @@ class InventoryRepository {
     }
   }
 
+  // Update data supplier
+  Future<void> updateSupplier(String id, Map<String, dynamic> supplierData) async {
+    try {
+      await _supabase.from('suppliers').update(supplierData).eq('id', id);
+    } catch (e) {
+      throw Exception('Gagal memperbarui supplier: $e');
+    }
+  }
+
+  // Hapus data supplier
+  Future<void> deleteSupplier(String id) async {
+    try {
+      await _supabase.from('suppliers').delete().eq('id', id);
+    } catch (e) {
+      throw Exception('Gagal menghapus supplier: $e');
+    }
+  }
+
   // ==========================================
   // TRANSAKSI & STOK
   // ==========================================
@@ -221,27 +239,165 @@ class InventoryRepository {
   // ==========================================
 
   Future<Map<String, dynamic>> getDashboardStats() async {
+    int totalItems = 0;
+    int lowStockCount = 0;
+    double totalValue = 0;
+    int pendingRequests = 0;
+    int pendingMaintenance = 0;
+
+    // 1. Ambil data barang (Items) langsung dari tabel 'items'
     try {
-      final itemsRes = await _supabase.from('items').select('id').count(CountOption.exact);
-      final lowStockRes = await _supabase.from('items').select('id').filter('stock', 'lt', 'min_stock').count(CountOption.exact);
-      final pendingReqRes = await _supabase.from('requests').select('id').eq('status', 'pending').count(CountOption.exact);
-      
-      final totalAsetResult = await _supabase.rpc('get_total_inventory_value');
-      
-      return {
-        'total_items': itemsRes.count,
-        'low_stock': lowStockRes.count,
-        'pending_requests': pendingReqRes.count,
-        'total_value': totalAsetResult ?? 0,
-      };
+      final List<dynamic> items = await _supabase.from('items').select('*');
+      totalItems = items.length;
+
+      for (var item in items) {
+        final num stock = item['stock'] ?? 0;
+        final num minStock = item['min_stock'] ?? 0;
+        final num price = item['price'] ?? item['unit_price'] ?? item['harga'] ?? 0;
+
+        if (stock < minStock) {
+          lowStockCount++;
+        }
+        totalValue += (stock * price);
+      }
     } catch (e) {
-      return {
-        'total_items': 0,
-        'low_stock': 0,
-        'pending_requests': 0,
-        'total_value': 0,
-      };
+      // Jika terjadi error saat fetch items
     }
+
+    // 2. Ambil data pengajuan pending dari tabel 'requests'
+    try {
+      final List<dynamic> requests = await _supabase
+          .from('requests')
+          .select('id')
+          .eq('status', 'pending');
+      pendingRequests = requests.length;
+    } catch (e) {
+      // Jika terjadi error saat fetch requests
+    }
+
+    // 3. Ambil data laporan kerusakan/pemeliharaan pending dari tabel 'maintenance_logs'
+    try {
+      final List<dynamic> maintenanceLogs = await _supabase
+          .from('maintenance_logs')
+          .select('id')
+          .eq('status', 'pending');
+      pendingMaintenance = maintenanceLogs.length;
+    } catch (e) {
+      // Jika terjadi error saat fetch maintenance_logs
+    }
+
+    // Jika RPC get_total_inventory_value ada dan totalValue masih 0, coba panggil RPC
+    if (totalValue == 0) {
+      try {
+        final totalAsetResult = await _supabase.rpc('get_total_inventory_value');
+        if (totalAsetResult != null) {
+          totalValue = (totalAsetResult as num).toDouble();
+        }
+      } catch (_) {}
+    }
+
+    // Total pending gabungan (Permintaan Barang + Laporan Pemeliharaan/Kerusakan)
+    int totalPending = pendingRequests + pendingMaintenance;
+
+    return {
+      'total_items': totalItems,
+      'low_stock': lowStockCount,
+      'pending_requests': totalPending,
+      'pending_maintenance': pendingMaintenance,
+      'total_value': totalValue,
+    };
+  }
+
+  // Ambil data aktivitas terbaru secara real-time
+  Future<List<Map<String, dynamic>>> getRecentActivities({String? userId, String? role}) async {
+    List<Map<String, dynamic>> activities = [];
+
+    // 1. Ambil transaksi stok terbaru
+    try {
+      var query = _supabase
+          .from('stock_transactions')
+          .select('*, items(name), profiles(full_name)');
+      
+      if (userId != null && role == 'unit_poli') {
+        query = query.eq('user_id', userId);
+      }
+      
+      final transactions = await query.order('created_at', ascending: false).limit(5);
+
+      for (var tx in transactions) {
+        final createdAt = DateTime.tryParse(tx['created_at']?.toString() ?? '') ?? DateTime.now();
+        final itemName = tx['items']?['name'] ?? 'Barang';
+        final qty = tx['quantity'] ?? 0;
+        final userName = tx['profiles']?['full_name'] ?? 'Sistem';
+        final type = tx['type']?.toString();
+
+        String title = 'Transaksi Stok';
+        String iconType = 'info';
+
+        if (type == 'masuk') {
+          title = 'Barang Masuk: $itemName ($qty Unit)';
+          iconType = 'masuk';
+        } else if (type == 'keluar') {
+          title = 'Barang Keluar: $itemName ($qty Unit)';
+          iconType = 'keluar';
+        } else if (type == 'mutasi') {
+          title = 'Mutasi Barang: $itemName ($qty Unit)';
+          iconType = 'mutasi';
+        }
+
+        activities.add({
+          'title': title,
+          'subtitle': 'Oleh $userName',
+          'created_at': createdAt,
+          'type': iconType,
+        });
+      }
+    } catch (_) {}
+
+    // 2. Ambil laporan pemeliharaan/kerusakan terbaru
+    try {
+      var query = _supabase
+          .from('maintenance_logs')
+          .select('''
+            *,
+            items(name),
+            reporter:profiles!maintenance_logs_reporter_id_fkey(full_name)
+          ''');
+
+      if (userId != null && role == 'unit_poli') {
+        query = query.eq('reporter_id', userId);
+      }
+
+      final logs = await query.order('created_at', ascending: false).limit(5);
+
+      for (var log in logs) {
+        final createdAt = DateTime.tryParse(log['created_at']?.toString() ?? '') ?? DateTime.now();
+        final itemName = log['items']?['name'] ?? 'Barang';
+        final reporter = log['reporter']?['full_name'] ?? 'Pelapor';
+        final status = log['status']?.toString() ?? 'pending';
+
+        activities.add({
+          'title': 'Lapor Kerusakan: $itemName',
+          'subtitle': 'Oleh $reporter • Status: ${status.toUpperCase()}',
+          'created_at': createdAt,
+          'type': 'maintenance',
+        });
+      }
+    } catch (_) {}
+
+    // 3. Urutkan semua aktivitas berdasarkan waktu terbaru
+    activities.sort((a, b) {
+      final aDate = a['created_at'] as DateTime;
+      final bDate = b['created_at'] as DateTime;
+      return bDate.compareTo(aDate);
+    });
+
+    // Ambil maksimal 5 aktivitas teratas
+    if (activities.length > 5) {
+      return activities.sublist(0, 5);
+    }
+
+    return activities;
   }
 
   // Ambil profil staf untuk penugasan
