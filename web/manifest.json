@@ -1,11 +1,11 @@
 {
-    "name": "untitled4",
-    "short_name": "untitled4",
+    "name": "SIMFAS",
+    "short_name": "SIMFAS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Sistem Manajemen Fasilitas RSDI Kendal.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

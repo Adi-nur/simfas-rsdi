@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:typed_data';
+import '../models/inventory_item.dart';
 
 class InventoryRepository {
   final _supabase = Supabase.instance.client;
@@ -42,11 +43,9 @@ class InventoryRepository {
       );
 
       final String publicUrl = _supabase.storage.from('inventory_assets').getPublicUrl(fullPath);
-      // Jangan gunakan timestamp jika itu merusak CORS di beberapa browser
       return publicUrl;
     } catch (e) {
-      print('DEBUG STORAGE ERROR: $e');
-      rethrow; // Biarkan UI menangkap error untuk ditampilkan
+      rethrow;
     }
   }
 
@@ -114,6 +113,61 @@ class InventoryRepository {
       await _supabase.from('suppliers').delete().eq('id', id);
     } catch (e) {
       throw Exception('Gagal menghapus supplier: $e');
+    }
+  }
+
+  // ==========================================
+  // MASTER DATA: KATEGORI
+  // ==========================================
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    try {
+      final response = await _supabase
+          .from('categories')
+          .select('*')
+          .order('name');
+      
+      if (response.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+    } catch (_) {
+      // Jika tabel belum ada di DB, kembalikan daftar default
+    }
+
+    return [
+      {'id': '1', 'name': 'Obat', 'code': 'OBT', 'description': 'Obat-obatan medis & farmasi'},
+      {'id': '2', 'name': 'Alat Medis', 'code': 'ALK', 'description': 'Peralatan medis & bedah'},
+      {'id': '3', 'name': 'Bahan Habis Pakai (BHP)', 'code': 'BHP', 'description': 'Spuit, perban, kassa, infus'},
+      {'id': '4', 'name': 'Alat Pelindung Diri (APD)', 'code': 'APD', 'description': 'Masker, hazmat, sarung tangan'},
+      {'id': '5', 'name': 'Laboratorium', 'code': 'LAB', 'description': 'Reagen & bahan uji laboratorium'},
+      {'id': '6', 'name': 'Radiologi', 'code': 'RAD', 'description': 'Film X-ray & bahan radiologi'},
+      {'id': '7', 'name': 'ATK & Cetakan', 'code': 'ATK', 'description': 'Alat tulis kantor & formulir'},
+      {'id': '8', 'name': 'Elektronik & IT', 'code': 'ELK', 'description': 'Komputer, printer & medis elektronik'},
+      {'id': '9', 'name': 'Furniture & Mebel', 'code': 'FUR', 'description': 'Bed pasien, meja, kursi, lemari'},
+    ];
+  }
+
+  Future<void> addCategory(Map<String, dynamic> categoryData) async {
+    try {
+      await _supabase.from('categories').insert(categoryData);
+    } catch (e) {
+      throw Exception('Gagal menambah kategori: $e');
+    }
+  }
+
+  Future<void> updateCategory(String id, Map<String, dynamic> categoryData) async {
+    try {
+      await _supabase.from('categories').update(categoryData).eq('id', id);
+    } catch (e) {
+      throw Exception('Gagal memperbarui kategori: $e');
+    }
+  }
+
+  Future<void> deleteCategory(String id) async {
+    try {
+      await _supabase.from('categories').delete().eq('id', id);
+    } catch (e) {
+      throw Exception('Gagal menghapus kategori: $e');
     }
   }
 
@@ -245,24 +299,19 @@ class InventoryRepository {
     int pendingRequests = 0;
     int pendingMaintenance = 0;
 
-    // 1. Ambil data barang (Items) langsung dari tabel 'items'
+    // 1. Ambil data barang (Items) dan gunakan InventoryItem parsing agar 100% konsisten dengan Daftar Inventaris
     try {
-      final List<dynamic> items = await _supabase.from('items').select('*');
-      totalItems = items.length;
+      final List<Map<String, dynamic>> itemsData = await getAllItems();
+      totalItems = itemsData.length;
 
-      for (var item in items) {
-        final num stock = item['stock'] ?? 0;
-        final num minStock = item['min_stock'] ?? 0;
-        final num price = item['price'] ?? item['unit_price'] ?? item['harga'] ?? 0;
-
-        if (stock < minStock) {
+      for (var itemMap in itemsData) {
+        final item = InventoryItem.fromMap(itemMap);
+        if (item.stock < item.minStock) {
           lowStockCount++;
         }
-        totalValue += (stock * price);
+        totalValue += (item.stock * item.price);
       }
-    } catch (e) {
-      // Jika terjadi error saat fetch items
-    }
+    } catch (_) {}
 
     // 2. Ambil data pengajuan pending dari tabel 'requests'
     try {
@@ -271,9 +320,7 @@ class InventoryRepository {
           .select('id')
           .eq('status', 'pending');
       pendingRequests = requests.length;
-    } catch (e) {
-      // Jika terjadi error saat fetch requests
-    }
+    } catch (_) {}
 
     // 3. Ambil data laporan kerusakan/pemeliharaan pending dari tabel 'maintenance_logs'
     try {
@@ -282,9 +329,7 @@ class InventoryRepository {
           .select('id')
           .eq('status', 'pending');
       pendingMaintenance = maintenanceLogs.length;
-    } catch (e) {
-      // Jika terjadi error saat fetch maintenance_logs
-    }
+    } catch (_) {}
 
     // Jika RPC get_total_inventory_value ada dan totalValue masih 0, coba panggil RPC
     if (totalValue == 0) {
@@ -487,11 +532,7 @@ class InventoryRepository {
         updateData['cost'] = cost;
       }
 
-      // Handle Audit Log (Append to existing jsonb array if possible, or just overwrite for now as a simple implementation)
-      // In a real Supabase setup, you might use a separate table or a more complex RPC to append to JSONB.
-      // For this implementation, we assume the UI provides the new log entry.
       if (auditEntry != null) {
-        // Fetch current audit log first
         final current = await _supabase.from('maintenance_logs').select('audit_log').eq('id', id).single();
         List<dynamic> logs = current['audit_log'] ?? [];
         logs.add({
@@ -512,7 +553,7 @@ class InventoryRepository {
       final totalCostRes = await _supabase.rpc('get_total_maintenance_cost');
       final topDamagedRes = await _supabase.from('maintenance_logs')
           .select('item_id, items(name)')
-          .limit(5); // In a real app, you'd use a grouped query or RPC
+          .limit(5);
       
       final pendingCount = await _supabase.from('maintenance_logs').select('id').eq('status', 'pending').count(CountOption.exact);
       final processCount = await _supabase.from('maintenance_logs').select('id').eq('status', 'perbaikan').count(CountOption.exact);
@@ -521,7 +562,7 @@ class InventoryRepository {
         'total_cost': totalCostRes ?? 0,
         'pending': pendingCount.count,
         'in_progress': processCount.count,
-        'top_damaged': topDamagedRes, // Mockup structure
+        'top_damaged': topDamagedRes,
       };
     } catch (e) {
       return {'total_cost': 0, 'pending': 0, 'in_progress': 0, 'top_damaged': []};

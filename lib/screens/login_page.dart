@@ -610,7 +610,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 40),
 
                   const Text(
-                    '© 2026 RSDI KENDAL - Versi 1.0.0 Pro',
+                    '© 2026 RSDI KENDAL - Versi 1.0.2 Pro',
 
                     textAlign: TextAlign.center,
 

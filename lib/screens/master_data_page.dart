@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'item_list_page.dart';
 import 'supplier_list_page.dart';
+import 'category_list_page.dart';
 import 'user_management_page.dart';
 import '../services/auth_service.dart';
 import '../models/user_role.dart';
@@ -128,9 +129,9 @@ class MasterDataPage extends StatelessWidget {
                       icon: Icons.category_rounded,
                       color: Colors.purple,
                       onTap: () {
-                        _showComingSoon(
+                        _openPage(
                           context,
-                          'Kategori',
+                          const CategoryListPage(),
                         );
                       },
                     ),

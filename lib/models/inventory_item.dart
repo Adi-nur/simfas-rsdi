@@ -52,7 +52,7 @@ class InventoryItem {
       unit: map['unit'] ?? '',
       stock: int.tryParse(map['stock']?.toString() ?? '0') ?? 0,
       minStock: int.tryParse(map['min_stock']?.toString() ?? '0') ?? 0,
-      price: double.tryParse(map['price']?.toString() ?? '0.0') ?? 0.0,
+      price: double.tryParse(map['price']?.toString() ?? map['unit_price']?.toString() ?? map['harga']?.toString() ?? '0.0') ?? 0.0,
       expiredDate: map['expired_date'] != null ? DateTime.parse(map['expired_date']) : null,
       location: map['location'] ?? '',
       supplier: map['supplier'] ?? '',
